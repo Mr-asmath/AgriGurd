@@ -848,6 +848,7 @@ with tab2:
             popup='Emergency Zone - Drainage Locked'
         ).add_to(m)
     
+    m = folium.Map(location=[0, 0], zoom_start=2)  # correct
     st_folium(m, height=300, width=700)
     
     # Water Level History Chart
@@ -1200,4 +1201,5 @@ st.sidebar.markdown(f"""
     <small>Water: <b>{st.session_state.water_level:.1f}%</b></small><br>
     <small>Drain: <b>{'🔓 OPEN' if st.session_state.drain_open else '🔒 CLOSED'}</b></small>
 </div>
+
 """, unsafe_allow_html=True)
