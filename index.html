@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<title>Smart Tank Automation</title>
+
+<style>
+body {
+  background: #eaf7f1;
+  font-family: Arial;
+  padding: 20px;
+}
+
+.container {
+  max-width: 420px;
+  margin: auto;
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0,0,0,0.15);
+  text-align: center;
+}
+
+h2 { color: #1b5e20; }
+
+.tank {
+  width: 160px;
+  height: 260px;
+  border: 4px solid #333;
+  border-radius: 0 0 15px 15px;
+  margin: 20px auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.water {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(#4fc3f7, #0288d1);
+  transition: height 1.5s ease;
+}
+
+.lid {
+  width: 170px;
+  height: 10px;
+  background: #555;
+  margin: auto;
+  transition: transform 1s ease;
+}
+
+.lid.closed {
+  transform: translateY(10px);
+}
+
+.valve.open { color: green; font-weight: bold; }
+.valve.closed { color: red; font-weight: bold; }
+
+.suggestion {
+  background: #e8f5e9;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 15px;
+  text-align: left;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h2>🚰 Smart Water Tank System</h2>
+
+  <div class="lid" id="lid"></div>
+
+  <div class="tank">
+    <div class="water" id="water"></div>
+  </div>
+
+  <p id="levelText"><b>Water Level:</b> 0%</p>
+  <p id="valveStatus" class="valve open">Valve: OPEN</p>
+
+  <div class="suggestion">
+    <h4>📌 Owner Suggestions</h4>
+    <ul id="suggestionText">
+      <li>Tank filling started</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+if ("Notification" in window) {
+  Notification.requestPermission();
+}
+
+let waterLevel = 0;
+let notified = false;
+
+function notify(title, msg) {
+  if (Notification.permission === "granted") {
+    new Notification(title, { body: msg });
+  }
+}
+
+function fillTank() {
+  if (waterLevel < 100) {
+    waterLevel += 10;
+    document.getElementById("water").style.height = waterLevel + "%";
+    document.getElementById("levelText").innerText =
+      "Water Level: " + waterLevel + "%";
+  }
+
+  if (waterLevel >= 100 && !notified) {
+    notified = true;
+
+    document.getElementById("valveStatus").innerText = "Valve: CLOSED";
+    document.getElementById("valveStatus").className = "valve closed";
+    document.getElementById("lid").classList.add("closed");
+
+    document.getElementById("suggestionText").innerHTML = `
+      <li>Tank is full</li>
+      <li>Valve automatically closed</li>
+      <li>No manual action required</li>
+    `;
+
+    notify("🛑 Tank Full", "Tank நிரம்பியுள்ளது. Valve தானாக மூடப்பட்டது.");
+  }
+}
+
+setInterval(fillTank, 3000);
+</script>
+
+</body>
+</html>
