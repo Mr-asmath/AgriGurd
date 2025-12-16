@@ -1,17 +1,8 @@
 streamlit==1.28.0
-streamlit-folium
-rich==13.6.0          # compatible with Streamlit 1.28.0
+streamlit-folium==0.21.0
+rich==13.6.0
 markdown-it-py==4.0.0
 mdurl==0.1.2
 folium==0.14.0
 numpy==1.26.2
 pandas==2.1.1
-time
-json
-datetime
-hashlib
-uuid
-base64
-io
-sqlite3
-
