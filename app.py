@@ -17,7 +17,12 @@ import subprocess
 import sys
 
 # Set page configuration
-st.set_page_config(page_title="Smart Agriculture IoT", layout="centered", initial_sidebar_state="expanded")
+#st.set_page_config(page_title="Smart Agriculture IoT", layout="centered")
+st.set_page_config(
+    page_title="AgriGurd",
+    page_icon="🌾",
+    layout="wide", initial_sidebar_state="expanded"
+)
 
 # ------------------ DATABASE SETUP ------------------
 def init_db():
@@ -2170,5 +2175,6 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
+
 
 
