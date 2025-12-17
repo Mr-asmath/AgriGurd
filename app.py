@@ -17,11 +17,11 @@ import subprocess
 import sys
 
 # Set page configuration
-#st.set_page_config(page_title="Smart Agriculture IoT", layout="centered")
 st.set_page_config(
     page_title="AgriGurd",
     page_icon="🌾",
-    layout="wide", initial_sidebar_state="expanded"
+    layout="wide", 
+    initial_sidebar_state="expanded"
 )
 
 # ------------------ DATABASE SETUP ------------------
@@ -76,7 +76,6 @@ def init_db():
         c.execute('''INSERT INTO users (username, password_hash, user_id, farm_name, location, is_admin)
                      VALUES (?, ?, ?, ?, ?, ?)''',
                   ('admin', admin_hash, 'ADMIN001', 'System Administration', 'Control Center', 1))
-    
     else:
         # Ensure admin user has is_admin set to 1
         c.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
@@ -88,7 +87,6 @@ def init_db():
 init_db()
 
 # ------------------ AUDIO FILES (Base64 Encoded) ------------------
-# Real working audio data (short beep sounds)
 EMERGENCY_SOUND = """
 data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==
 """
@@ -114,35 +112,6 @@ def safe_st_folium(m, height=300):
         st.error(f"Map loading error: {str(e)}")
         # Fallback to simple map display
         st.map(pd.DataFrame({'lat': [10.79], 'lon': [78.70]}), zoom=13)
-
-# ------------------ ADMIN REDIRECT FUNCTION ------------------
-def redirect_to_admin():
-    """Redirect to admin data viewer"""
-    st.session_state.admin_redirect = True
-    st.rerun()
-
-def run_admin_viewer():
-    """Run the admin data viewer"""
-    # Store current session state
-    current_user = st.session_state.get('current_user')
-    current_user_id = st.session_state.get('current_user_id')
-    
-    # Clear session state for admin
-    st.session_state.clear()
-    
-    # Set admin flag
-    st.session_state.is_admin = True
-    st.session_state.original_user = current_user
-    st.session_state.original_user_id = current_user_id
-    
-    # Run the admin viewer
-    import log  # This will run the log.py script
-    
-    # After admin viewer closes, restore original user
-    st.session_state.current_user = current_user
-    st.session_state.current_user_id = current_user_id
-    st.session_state.is_admin = False
-    st.rerun()
 
 # ------------------ USER MANAGEMENT WITH SQLite ------------------
 class UserManager:
@@ -316,7 +285,7 @@ class UserManager:
         for row in c.fetchall():
             level, created_at = row
             history.append({
-                "time": created_at[11:16],  # Extract HH:MM
+                "time": created_at[11:16] if len(created_at) > 10 else created_at,  # Extract HH:MM
                 "level": float(level)
             })
         
@@ -982,42 +951,433 @@ def get_water_level_status(level):
     else:
         return "success", "LOW - Irrigation Needed"
 
-# ------------------ CHECK FOR ADMIN REDIRECT ------------------
-if st.session_state.get('admin_redirect'):
-    # Clear the redirect flag
-    st.session_state.admin_redirect = False
-    
-    # Run the admin viewer
-    st.markdown('<div class="admin-title">🔐 Admin Data Viewer</div>', unsafe_allow_html=True)
-    st.info("Loading admin data viewer...")
-    
-    # Import and run the log.py module
-    import importlib.util
-    import sys
-    
-    # Path to log.py (assuming it's in the same directory)
-    log_path = "log.py"
-    
-    if os.path.exists(log_path):
-        # Read and execute the log.py file
-        with open(log_path, 'r', encoding='utf-8') as f:
-            log_code = f.read()
+# ------------------ ADMIN REDIRECT ------------------
+# Update the load_admin_module function in the code:
+
+# ------------------ ADMIN REDIRECT ------------------
+def load_admin_module():
+    """Dynamically load admin module"""
+    try:
+        # Import the admin module from the same directory
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         
-        # Create a module for the log code
-        spec = importlib.util.spec_from_loader("log", loader=None)
-        log_module = importlib.util.module_from_spec(spec)
+        # Check if log.py exists
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log.py")
+        if os.path.exists(log_path):
+            # Clear the current display
+            st.empty()
+            
+            # Read the log.py content with proper encoding handling
+            try:
+                # Try UTF-8 first
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    admin_code = f.read()
+            except UnicodeDecodeError:
+                try:
+                    # Try Latin-1 if UTF-8 fails
+                    with open(log_path, 'r', encoding='latin-1') as f:
+                        admin_code = f.read()
+                except UnicodeDecodeError:
+                    # Try UTF-8 with error handling as last resort
+                    with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        admin_code = f.read()
+            
+            # Create a namespace for execution with all required imports
+            admin_namespace = {
+                'st': st,
+                'pd': pd,
+                'np': np,
+                'datetime': datetime,
+                'timedelta': timedelta,
+                'sqlite3': sqlite3,
+                'os': os,
+                'json': json,
+                'time': time,
+                'hashlib': hashlib,
+                'uuid': uuid,
+                'random': random,
+                'base64': base64,
+                'BytesIO': BytesIO,
+                'folium': folium,
+                'st_folium': st_folium
+            }
+            
+            # Execute the admin code
+            exec(admin_code, admin_namespace)
+            return True
+        else:
+            st.error("Admin module (log.py) not found in the current directory.")
+            # Create a simple admin viewer as fallback
+            st.info("Creating fallback admin viewer...")
+            create_fallback_admin_viewer()
+            return True
+    except Exception as e:
+        st.error(f"Error loading admin module: {str(e)}")
+        # Provide detailed error information
+        st.error("""
+        **Troubleshooting steps:**
+        1. Check if `log.py` exists in the same directory
+        2. Ensure `log.py` has valid Python syntax
+        3. Check file encoding (should be UTF-8)
+        4. Look for special characters in the file
+        """)
         
-        # Execute the code in the module's namespace
-        exec(log_code, log_module.__dict__)
-        
-        # Note: The log.py code will run and display its interface
-        # We need to prevent the rest of this script from running
-        st.stop()
-    else:
-        st.error("Admin data viewer (log.py) not found!")
+        # Create a fallback admin interface
+        st.info("Loading fallback admin interface...")
+        create_fallback_admin_viewer()
+        return True
+
+def create_fallback_admin_viewer():
+    """Create a fallback admin interface when log.py fails to load"""
+    st.markdown("## 🔧 Fallback Admin Interface")
+    
+    conn = sqlite3.connect('smart_agriculture.db')
+    
+    # Users table
+    st.subheader("👥 Users")
+    users_df = pd.read_sql_query("SELECT * FROM users", conn)
+    st.dataframe(users_df, use_container_width=True)
+    
+    # Sensor data
+    st.subheader("📊 Sensor Data")
+    sensor_df = pd.read_sql_query("SELECT * FROM sensor_data", conn)
+    st.dataframe(sensor_df, use_container_width=True)
+    
+    # Notifications
+    st.subheader("🔔 Notifications")
+    notifications_df = pd.read_sql_query("SELECT * FROM notifications", conn)
+    st.dataframe(notifications_df, use_container_width=True)
+    
+    # Water level history
+    st.subheader("💧 Water Level History")
+    water_df = pd.read_sql_query("SELECT * FROM water_level_history", conn)
+    st.dataframe(water_df, use_container_width=True)
+    
+    conn.close()
+    
+    # Admin actions
+    st.subheader("⚙️ Admin Actions")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Simulate All Sensor Data"):
+            with st.spinner("Simulating sensor data for all users..."):
+                conn = sqlite3.connect('smart_agriculture.db')
+                users = conn.execute("SELECT user_id FROM users").fetchall()
+                for user in users:
+                    simulate_sensor_data(user[0])
+                conn.close()
+                st.success("Sensor data simulated for all users!")
+                st.rerun()
+    
+    with col2:
+        if st.button("🗑️ Clear Old Notifications"):
+            with st.spinner("Clearing notifications older than 30 days..."):
+                conn = sqlite3.connect('smart_agriculture.db')
+                cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                deleted = conn.execute(
+                    "DELETE FROM notifications WHERE DATE(created_at) < ?", 
+                    (cutoff_date,)
+                ).rowcount
+                conn.commit()
+                conn.close()
+                st.success(f"Deleted {deleted} old notifications!")
+                st.rerun()
+
+# Replace the entire "CHECK FOR ADMIN REDIRECT" section and "load_admin_module" function with this:
+
+# ------------------ ADMIN VIEW (Integrated) ------------------
+def show_admin_dashboard():
+    """Show integrated admin dashboard"""
+    st.markdown('<div class="admin-title">👑 Admin Dashboard</div>', unsafe_allow_html=True)
+    
+    # Check if user is actually admin
+    if not st.session_state.get('is_admin'):
+        st.error("Access denied. Admin privileges required.")
         if st.button("Return to Dashboard"):
             st.session_state.admin_redirect = False
             st.rerun()
+        return
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "👥 Users", "📈 Analytics", "⚙️ Settings"])
+    
+    with tab1:
+        st.markdown("## 📊 System Overview")
+        
+        conn = sqlite3.connect('smart_agriculture.db')
+        
+        # Quick stats
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            st.metric("Total Users", total_users)
+        
+        with col2:
+            total_alerts = conn.execute("SELECT COUNT(*) FROM notifications").fetchone()[0]
+            st.metric("Total Alerts", total_alerts)
+        
+        with col3:
+            active_users = conn.execute("""
+                SELECT COUNT(DISTINCT user_id) 
+                FROM sensor_data 
+                WHERE datetime(last_update) > datetime('now', '-24 hours')
+            """).fetchone()[0]
+            st.metric("Active Users (24h)", active_users)
+        
+        with col4:
+            emergencies = conn.execute("""
+                SELECT COUNT(*) 
+                FROM notifications 
+                WHERE notification_type = 'emergency'
+                AND datetime(created_at) > datetime('now', '-7 days')
+            """).fetchone()[0]
+            st.metric("Emergencies (7d)", emergencies)
+        
+        # Recent activity
+        st.markdown("### 🔄 Recent Activity")
+        
+        # Recent notifications
+        recent_notifs = pd.read_sql_query("""
+            SELECT n.*, u.username, u.farm_name
+            FROM notifications n
+            JOIN users u ON n.user_id = u.user_id
+            ORDER BY n.created_at DESC
+            LIMIT 10
+        """, conn)
+        
+        if not recent_notifs.empty:
+            st.dataframe(recent_notifs[['username', 'farm_name', 'title', 'notification_type', 'created_at']], 
+                        use_container_width=True, hide_index=True)
+        else:
+            st.info("No recent notifications")
+        
+        conn.close()
+    
+    with tab2:
+        st.markdown("## 👥 User Management")
+        
+        conn = sqlite3.connect('smart_agriculture.db')
+        
+        # Users table with actions
+        users_df = pd.read_sql_query("""
+            SELECT username, user_id, farm_name, location, created_at, is_admin
+            FROM users
+            ORDER BY created_at DESC
+        """, conn)
+        
+        st.dataframe(users_df, use_container_width=True)
+        
+        # User actions
+        st.markdown("### 👤 User Actions")
+        
+        col_user1, col_user2, col_user3 = st.columns(3)
+        
+        with col_user1:
+            st.markdown("#### Add New User")
+            with st.form("add_user_form"):
+                new_username = st.text_input("Username")
+                new_password = st.text_input("Password", type="password")
+                new_farm = st.text_input("Farm Name")
+                new_location = st.text_input("Location")
+                is_admin_user = st.checkbox("Admin User")
+                
+                if st.form_submit_button("Create User"):
+                    if new_username and new_password and new_farm:
+                        success, message = user_manager.create_user(new_username, new_password, new_farm, new_location)
+                        if success:
+                            if is_admin_user:
+                                conn.execute("UPDATE users SET is_admin = 1 WHERE username = ?", (new_username,))
+                                conn.commit()
+                            st.success(f"User '{new_username}' created successfully!")
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {message}")
+                    else:
+                        st.error("Please fill required fields")
+        
+        with col_user2:
+            st.markdown("#### Send Notification")
+            with st.form("send_notification_form"):
+                target_user = st.selectbox("Select User", users_df['username'].tolist())
+                notif_title = st.text_input("Title")
+                notif_message = st.text_area("Message")
+                notif_type = st.selectbox("Type", ["info", "warning", "success", "emergency"])
+                
+                if st.form_submit_button("Send Notification"):
+                    if target_user and notif_title:
+                        user_id = users_df[users_df['username'] == target_user]['user_id'].iloc[0]
+                        user_manager.add_notification(user_id, notif_title, notif_message, notif_type)
+                        st.success(f"Notification sent to {target_user}!")
+                        st.rerun()
+                    else:
+                        st.error("Please fill required fields")
+        
+        with col_user3:
+            st.markdown("#### System Actions")
+            
+            if st.button("🔄 Simulate All Users Data", use_container_width=True):
+                with st.spinner("Simulating..."):
+                    users = conn.execute("SELECT user_id FROM users").fetchall()
+                    for user in users:
+                        simulate_sensor_data(user[0])
+                    st.success(f"Simulated data for {len(users)} users!")
+                    st.rerun()
+            
+            if st.button("🗑️ Clean Old Data", use_container_width=True):
+                with st.spinner("Cleaning..."):
+                    cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                    water_count = conn.execute(
+                        "DELETE FROM water_level_history WHERE DATE(created_at) < ?", 
+                        (cutoff_date,)
+                    ).rowcount
+                    notif_count = conn.execute(
+                        "DELETE FROM notifications WHERE DATE(created_at) < ?", 
+                        (cutoff_date,)
+                    ).rowcount
+                    conn.commit()
+                    st.success(f"Cleaned {water_count} water records and {notif_count} notifications!")
+                    st.rerun()
+        
+        conn.close()
+    
+    with tab3:
+        st.markdown("## 📈 System Analytics")
+        
+        conn = sqlite3.connect('smart_agriculture.db')
+        
+        # Chart 1: Users by location
+        st.markdown("### 📍 Users by Location")
+        location_data = pd.read_sql_query("""
+            SELECT location, COUNT(*) as count
+            FROM users
+            GROUP BY location
+            ORDER BY count DESC
+        """, conn)
+        
+        if not location_data.empty:
+            st.bar_chart(location_data.set_index('location')['count'])
+        
+        # Chart 2: Notifications by type
+        st.markdown("### 🔔 Notifications by Type")
+        notif_data = pd.read_sql_query("""
+            SELECT notification_type, COUNT(*) as count
+            FROM notifications
+            WHERE datetime(created_at) > datetime('now', '-30 days')
+            GROUP BY notification_type
+        """, conn)
+        
+        if not notif_data.empty:
+            st.bar_chart(notif_data.set_index('notification_type')['count'])
+        
+        # Chart 3: Active times
+        st.markdown("### ⏰ Activity by Hour")
+        activity_data = pd.read_sql_query("""
+            SELECT strftime('%H', created_at) as hour, COUNT(*) as count
+            FROM notifications
+            WHERE datetime(created_at) > datetime('now', '-7 days')
+            GROUP BY strftime('%H', created_at)
+            ORDER BY hour
+        """, conn)
+        
+        if not activity_data.empty:
+            st.line_chart(activity_data.set_index('hour')['count'])
+        
+        # Data export
+        st.markdown("### 📤 Data Export")
+        
+        col_exp1, col_exp2 = st.columns(2)
+        
+        with col_exp1:
+            if st.button("Export Users Data"):
+                users_df = pd.read_sql_query("SELECT * FROM users", conn)
+                csv = users_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Users CSV",
+                    data=csv,
+                    file_name="users_export.csv",
+                    mime="text/csv"
+                )
+        
+        with col_exp2:
+            if st.button("Export Sensor Data"):
+                sensor_df = pd.read_sql_query("SELECT * FROM sensor_data", conn)
+                csv = sensor_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Sensor CSV",
+                    data=csv,
+                    file_name="sensor_export.csv",
+                    mime="text/csv"
+                )
+        
+        conn.close()
+    
+    with tab4:
+        st.markdown("## ⚙️ System Settings")
+        
+        # Database info
+        conn = sqlite3.connect('smart_agriculture.db')
+        
+        db_size = os.path.getsize('smart_agriculture.db') / (1024 * 1024)  # MB
+        
+        st.metric("Database Size", f"{db_size:.2f} MB")
+        
+        # Table sizes
+        tables = ['users', 'sensor_data', 'notifications', 'water_level_history']
+        for table in tables:
+            count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            st.metric(f"{table.replace('_', ' ').title()}", f"{count:,}")
+        
+        # System info
+        st.markdown("### ℹ️ System Information")
+        
+        info_col1, info_col2 = st.columns(2)
+        
+        with info_col1:
+            st.info(f"**Python Version:** {sys.version.split()[0]}")
+            st.info(f"**Streamlit Version:** {st.__version__}")
+            st.info(f"**Pandas Version:** {pd.__version__}")
+        
+        with info_col2:
+            st.info(f"**Database Path:** {os.path.abspath('smart_agriculture.db')}")
+            st.info(f"**Current Directory:** {os.getcwd()}")
+            st.info(f"**System Time:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        conn.close()
+        
+        # Danger zone
+        st.markdown("### ⚠️ Danger Zone")
+        
+        with st.expander("Reset Database (⚠️ Irreversible)"):
+            st.warning("This will delete ALL data and reset the database to initial state.")
+            if st.button("🗑️ Reset Database", type="secondary"):
+                os.remove('smart_agriculture.db')
+                init_db()
+                st.success("Database reset complete!")
+                st.rerun()
+    
+    # Return button
+    st.markdown("---")
+    if st.button("← Return to Main Dashboard", use_container_width=True):
+        st.session_state.admin_redirect = False
+        st.rerun()
+
+# ------------------ CHECK FOR ADMIN REDIRECT ------------------
+if st.session_state.get('admin_redirect'):
+    st.session_state.admin_redirect = False
+    show_admin_dashboard()
+    st.stop()
+# ------------------ CHECK FOR ADMIN REDIRECT ------------------
+if st.session_state.get('admin_redirect'):
+    st.session_state.admin_redirect = False
+    st.markdown('<div class="admin-title">🔐 Admin Data Viewer</div>', unsafe_allow_html=True)
+    st.info("Loading admin data viewer...")
+    
+    if not load_admin_module():
+        if st.button("Return to Dashboard"):
+            st.session_state.admin_redirect = False
+            st.rerun()
+    st.stop()
 
 # ------------------ AUTHENTICATION SCREEN ------------------
 if not st.session_state.current_user:
@@ -1040,7 +1400,6 @@ if not st.session_state.current_user:
                 if username and password:
                     success, message = user_manager.authenticate(username, password)
                     if success:
-                        # Check if admin
                         if username == "admin" and password == "admin@1234":
                             st.success("Admin login successful! Redirecting to admin dashboard...")
                             time.sleep(1)
@@ -1083,6 +1442,13 @@ if not st.session_state.current_user:
 # ------------------ MAIN DASHBOARD (After Login) ------------------
 # Get current user data
 user_info, sensor_data, user_data = user_manager.get_current_user_data()
+
+# Check if user_info is None (user might have been deleted)
+if user_info is None:
+    st.error("User data not found. Please login again.")
+    user_manager.logout()
+    st.stop()
+
 user_id = user_info["user_id"]
 farm_name = user_info["farm_name"]
 location = user_info["location"]
@@ -1422,7 +1788,7 @@ if is_admin:
                     conn = sqlite3.connect('smart_agriculture.db')
                     users = conn.execute("SELECT user_id FROM users").fetchall()
                     for user in users:
-                        simulate_sensor_data(user['user_id'])
+                        simulate_sensor_data(user[0])
                     conn.close()
                     st.success("All sensor data refreshed!")
                     st.rerun()
@@ -1590,7 +1956,7 @@ if is_admin:
             st.success("Notifications ✓")
 
 else:
-    # Regular user tabs (existing code)
+    # Regular user tabs
     with tab1:
         # WEATHER & SENSOR CARDS
         col1, col2, col3, col4 = st.columns(4)
@@ -1667,7 +2033,7 @@ else:
                     {'OPEN' if sensor_data['drain_status'] else 'CLOSED'}</b></div>
                 <div>Auto Mode: <b style="color: {'#28a745' if st.session_state[f'auto_mode_{user_id}'] else '#6c757d'}">
                     {'ON' if st.session_state[f'auto_mode_{user_id}'] else 'OFF'}</b></div>
-                <div>Last Update: <b>{sensor_data['last_update'][11:19] if 'last_update' in sensor_data else 'N/A'}</b></div>
+                <div>Last Update: <b>{sensor_data['last_update'][11:19] if 'last_update' in sensor_data and len(sensor_data['last_update']) > 10 else 'N/A'}</b></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -2117,7 +2483,7 @@ with footer_col1:
     user_type = "👑 ADMIN" if is_admin else "👨‍🌾 USER"
     st.markdown(f"<small>{user_type}: <b>{st.session_state.current_user} | ID: {user_id}</b></small>", unsafe_allow_html=True)
 with footer_col2:
-    last_update = sensor_data.get('last_update', '')[11:19] if 'last_update' in sensor_data else 'N/A'
+    last_update = sensor_data.get('last_update', '')[11:19] if 'last_update' in sensor_data and len(sensor_data['last_update']) > 10 else 'N/A'
     status_icon = "🔴" if sensor_data['water_level'] >= 95 else "🟢"
     st.markdown(f"<small>📶 <b>Last Update:</b> {last_update} {status_icon}</small>", unsafe_allow_html=True)
 with footer_col3:
@@ -2175,6 +2541,3 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
-
-
-
