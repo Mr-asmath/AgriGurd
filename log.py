@@ -6,12 +6,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 # Set page configuration
-st.set_page_config(
-    page_title="Agriculture IoT Data Viewer",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Custom CSS for better styling
 st.markdown("""
@@ -869,4 +863,5 @@ st.markdown(
     </div>
     """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
     unsafe_allow_html=True
+
 )
