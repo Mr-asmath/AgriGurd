@@ -24,6 +24,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ---- HIDE STREAMLIT BRANDING ----
+hide_streamlit_style = """
+<style>
+/* Hide top header */
+header {visibility: hidden;}
+
+/* Hide footer */
+footer {visibility: hidden;}
+
+/* Hide "Made with Streamlit" */
+.stApp footer {display: none;}
+</style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # ------------------ DATABASE SETUP ------------------
 def init_db():
     """Initialize SQLite database"""
@@ -2527,4 +2542,5 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
+
 
