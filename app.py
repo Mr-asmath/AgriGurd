@@ -67,7 +67,6 @@ def init_db():
     # Check if admin user exists, if not create it
     admin_hash = hashlib.sha256("admin@1234".encode()).hexdigest()
     c.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
-    c.execute("alter table users add is_admin int")
     if c.fetchone()[0] == 0:
         c.execute('''INSERT INTO users (username, password_hash, user_id, farm_name, location, is_admin)
                      VALUES (?, ?, ?, ?, ?, ?)''',
@@ -2171,4 +2170,5 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
+
 
