@@ -2025,10 +2025,10 @@ else:
             <div class="water-level-text">Water Level: {water_height:.1f}%</div>
             <div class="tank" style="{border_effect}">
                 <div class="water" style="height:{water_height}%; background: {water_color};">
-                    {water_height:.1f}%
+                    {water_height:.1f}% <br>
                 </div>
             </div>
-        <br>
+            <br><br>
             <div style="margin-top: 10px; font-size: 14px; color: #666; text-align: center;">
                 <div>Drain Status: <b style="color: {'#28a745' if sensor_data['drain_status'] else '#dc3545'}">
                     {'OPEN' if sensor_data['drain_status'] else 'CLOSED'}</b></div>
@@ -2154,7 +2154,6 @@ else:
                         <span style="font-size: 24px; font-weight: bold;">{sensor_data['solar_input']:.0f} W</span>
                     </div>
                 </div>
-                
                 <div style="margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>Efficiency:</span>
@@ -2166,14 +2165,12 @@ else:
                         </div>
                     </div>
                 </div>
-                
                 <div style="margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>Daily Production:</span>
                         <span><b>{(sensor_data['solar_input'] * 12 / 1000):.1f} kWh</b></span>
                     </div>
                 </div>
-                
                 <div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>Status:</span>
@@ -2209,7 +2206,6 @@ else:
                         <span style="font-size: 24px; font-weight: bold;">{sensor_data['battery_level']:.0f}%</span>
                     </div>
                 </div>
-                
                 <div style="margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>Charge Level:</span>
@@ -2222,21 +2218,18 @@ else:
                         </div>
                     </div>
                 </div>
-                
                 <div style="margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>Estimated Runtime:</span>
                         <span><b>{(sensor_data['battery_level'] * 2):.0f} hours</b></span>
                     </div>
                 </div>
-                
                 <div style="margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>Charging:</span>
                         <span><b>{charging}</b></span>
                     </div>
                 </div>
-                
                 <div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>Health:</span>
@@ -2357,22 +2350,18 @@ else:
                         <span>Overall Status:</span>
                         <span class="badge {safety_color}">{safety_status}</span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                         <span>Auto-Control:</span>
                         <span><b>{auto_status}</b></span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin: 15px 0 8px 0;">
                         <span>Safety Margin:</span>
                         <span><b>{100 - sensor_data['water_level']:.1f}%</b></span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin: 15px 0 8px 0;">
                         <span>System Uptime:</span>
                         <span><b>99.8%</b></span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin: 15px 0 8px 0;">
                         <span>Last Maintenance:</span>
                         <span><b>15 days ago</b></span>
@@ -2403,22 +2392,18 @@ else:
                         <span><i class="fas fa-tint"></i> Water Level Sensor</span>
                         <span class="badge {water_sensor_class}">{water_sensor_status}</span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span><i class="fas fa-sun"></i> Solar Sensor</span>
                         <span class="badge {solar_sensor_class}">{solar_sensor_status}</span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span><i class="fas fa-battery-full"></i> Battery Monitor</span>
                         <span class="badge {battery_sensor_class}">{battery_sensor_status}</span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <span><i class="fas fa-cog"></i> Drainage Valve</span>
                         <span class="badge {drain_status_class}">{drain_status_text}</span>
                     </div>
-                    
                     <div style="display: flex; justify-content: space-between;">
                         <span><i class="fas fa-satellite-dish"></i> Communication</span>
                         <span class="badge success">Online</span>
@@ -2542,4 +2527,3 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
-
