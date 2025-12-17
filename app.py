@@ -1622,7 +1622,7 @@ with col_header1:
     if is_admin:
         st.markdown(f'<div class="admin-title">👑 {farm_name} - Admin Dashboard</div>', unsafe_allow_html=True)
     else:
-        st.markdown(f'<div class="title">🌾 {farm_name} - Smart Agriculture System</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="title">🌾 {farm_name} - AgriGurd</div>', unsafe_allow_html=True)
     
     st.markdown(f"<div class='subtitle'>Location: {location} | User ID: {user_id}</div>", unsafe_allow_html=True)
 
@@ -2527,3 +2527,4 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
+
