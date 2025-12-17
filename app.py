@@ -2028,6 +2028,7 @@ else:
                     {water_height:.1f}%
                 </div>
             </div>
+        <br>
             <div style="margin-top: 10px; font-size: 14px; color: #666; text-align: center;">
                 <div>Drain Status: <b style="color: {'#28a745' if sensor_data['drain_status'] else '#dc3545'}">
                     {'OPEN' if sensor_data['drain_status'] else 'CLOSED'}</b></div>
@@ -2541,3 +2542,4 @@ st.sidebar.markdown(f"""
     <small>Storage: <b>SQLite</b></small>
 </div>
 """, unsafe_allow_html=True)
+
