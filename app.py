@@ -67,10 +67,15 @@ def init_db():
     # Check if admin user exists, if not create it
     admin_hash = hashlib.sha256("admin@1234".encode()).hexdigest()
     c.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
+    c.execute("atler table users add is_admin int")
     if c.fetchone()[0] == 0:
         c.execute('''INSERT INTO users (username, password_hash, user_id, farm_name, location, is_admin)
                      VALUES (?, ?, ?, ?, ?, ?)''',
                   ('admin', admin_hash, 'ADMIN001', 'System Administration', 'Control Center', 1))
+    
+    else:
+        # Ensure admin user has is_admin set to 1
+        c.execute("UPDATE users SET is_admin = 1 WHERE username = 'admin'")
     
     conn.commit()
     conn.close()
