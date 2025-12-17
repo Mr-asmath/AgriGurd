@@ -68,22 +68,19 @@ def init_db():
 init_db()
 
 # ------------------ AUDIO FILES (Base64 Encoded) ------------------
-# Emergency sound (simple beep)
+# Real working audio data (short beep sounds)
 EMERGENCY_SOUND = """
 data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==
 """
 
-# Warning sound (different beep)
 WARNING_SOUND = """
 data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==
 """
 
-# Info sound (short beep)
 INFO_SOUND = """
 data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==
 """
 
-# Success sound (happy beep)
 SUCCESS_SOUND = """
 data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==
 """
@@ -129,10 +126,11 @@ class UserManager:
                       (username, password_hash, user_id, farm_name, location))
             
             # Initialize sensor data
+            initial_water = random.randint(50, 70)
             c.execute('''INSERT INTO sensor_data (user_id, solar_input, battery_level, water_level, drain_status)
                          VALUES (?, ?, ?, ?, ?)''',
                       (user_id, random.randint(800, 1000), random.randint(80, 100), 
-                       random.randint(50, 90), 1))
+                       initial_water, 0))
             
             # Add welcome notification
             c.execute('''INSERT INTO notifications (user_id, title, message, notification_type)
@@ -142,7 +140,7 @@ class UserManager:
             
             # Initialize water level history
             for i in range(24):
-                level = random.randint(40, 80)
+                level = random.randint(40, 70)
                 c.execute('''INSERT INTO water_level_history (user_id, water_level, created_at)
                              VALUES (?, ?, datetime('now', ?))''',
                          (user_id, level, f'-{23-i} hours'))
@@ -180,7 +178,7 @@ class UserManager:
     
     def get_current_user_data(self):
         if not st.session_state.current_user_id:
-            return None, None
+            return None, None, None
         
         conn = sqlite3.connect('smart_agriculture.db')
         c = conn.cursor()
@@ -193,7 +191,7 @@ class UserManager:
         
         if not user_row:
             conn.close()
-            return None, None
+            return None, None, None
         
         username, user_id, farm_name, location, created_at = user_row
         
@@ -213,13 +211,20 @@ class UserManager:
                 "last_update": last_update
             }
         else:
+            # Initialize with default values
             sensor_data = {
                 "solar_input": random.randint(800, 1000),
                 "battery_level": random.randint(80, 100),
-                "water_level": random.randint(50, 90),
-                "drain_status": True,
+                "water_level": random.randint(50, 70),
+                "drain_status": False,
                 "last_update": datetime.now().isoformat()
             }
+            # Save to database
+            c.execute('''INSERT INTO sensor_data (user_id, solar_input, battery_level, water_level, drain_status)
+                         VALUES (?, ?, ?, ?, ?)''',
+                      (user_id, sensor_data["solar_input"], sensor_data["battery_level"], 
+                       sensor_data["water_level"], sensor_data["drain_status"]))
+            conn.commit()
         
         # Get notifications
         c.execute('''SELECT title, message, notification_type, created_at, is_read
@@ -277,19 +282,29 @@ class UserManager:
         conn = sqlite3.connect('smart_agriculture.db')
         c = conn.cursor()
         
-        # Update sensor data
-        c.execute('''UPDATE sensor_data 
-                     SET solar_input = ?, battery_level = ?, water_level = ?, 
-                         drain_status = ?, last_update = CURRENT_TIMESTAMP
-                     WHERE user_id = ?''',
-                  (data.get("solar_input", 0), data.get("battery_level", 0),
-                   data.get("water_level", 0), data.get("drain_status", 0),
-                   user_id))
+        # First check if record exists
+        c.execute("SELECT COUNT(*) FROM sensor_data WHERE user_id = ?", (user_id,))
+        if c.fetchone()[0] == 0:
+            # Insert new record
+            c.execute('''INSERT INTO sensor_data (user_id, solar_input, battery_level, water_level, drain_status)
+                         VALUES (?, ?, ?, ?, ?)''',
+                      (user_id, data.get("solar_input", 0), data.get("battery_level", 0),
+                       data.get("water_level", 0), data.get("drain_status", 0)))
+        else:
+            # Update existing record
+            c.execute('''UPDATE sensor_data 
+                         SET solar_input = ?, battery_level = ?, water_level = ?, 
+                             drain_status = ?, last_update = CURRENT_TIMESTAMP
+                         WHERE user_id = ?''',
+                      (data.get("solar_input", 0), data.get("battery_level", 0),
+                       data.get("water_level", 0), data.get("drain_status", 0),
+                       user_id))
         
-        # Add to water level history
-        c.execute('''INSERT INTO water_level_history (user_id, water_level)
-                     VALUES (?, ?)''',
-                  (user_id, data.get("water_level", 0)))
+        # Add to water level history (only if water level changed)
+        if "water_level" in data:
+            c.execute('''INSERT INTO water_level_history (user_id, water_level)
+                         VALUES (?, ?)''',
+                      (user_id, data.get("water_level", 0)))
         
         conn.commit()
         conn.close()
@@ -314,6 +329,37 @@ class UserManager:
         
         conn.commit()
         conn.close()
+    
+    def update_water_level(self, user_id, change_percent):
+        """Update water level by a specific percentage"""
+        conn = sqlite3.connect('smart_agriculture.db')
+        c = conn.cursor()
+        
+        # Get current water level
+        c.execute("SELECT water_level FROM sensor_data WHERE user_id = ?", (user_id,))
+        result = c.fetchone()
+        
+        if result:
+            current_level = result[0]
+            new_level = max(0, min(100, current_level + change_percent))
+            
+            # Update in database
+            c.execute('''UPDATE sensor_data 
+                         SET water_level = ?, last_update = CURRENT_TIMESTAMP
+                         WHERE user_id = ?''',
+                      (new_level, user_id))
+            
+            # Add to history
+            c.execute('''INSERT INTO water_level_history (user_id, water_level)
+                         VALUES (?, ?)''',
+                      (user_id, new_level))
+            
+            conn.commit()
+            conn.close()
+            return new_level
+        
+        conn.close()
+        return None
 
 # Initialize User Manager
 user_manager = UserManager()
@@ -321,63 +367,62 @@ user_manager = UserManager()
 # ------------------ ENHANCED SOUND ALERT SYSTEM ------------------
 def generate_sound_alert(alert_type, user_id):
     """Generate HTML5 audio elements for different alert types with user-specific tracking"""
-
-    import time
-    import streamlit as st
-
     # Store last alert time to prevent spam
     if f"last_alert_{user_id}" not in st.session_state:
         st.session_state[f"last_alert_{user_id}"] = {}
-
+    
     current_time = time.time()
     last_time = st.session_state[f"last_alert_{user_id}"].get(alert_type, 0)
-
-    # Prevent same alert within 10 seconds
-    if current_time - last_time < 10:
+    
+    # Prevent same alert within 5 seconds
+    if current_time - last_time < 5:
         return ""
-
+    
     st.session_state[f"last_alert_{user_id}"][alert_type] = current_time
-
-    # Volume selection
+    
+    # Select sound data
     if alert_type == "emergency":
-        volume = 0.6
+        sound_data = EMERGENCY_SOUND
+        volume = 0.7
     elif alert_type == "warning":
-        volume = 0.4
-    elif alert_type in ("info", "success"):
+        sound_data = WARNING_SOUND
+        volume = 0.5
+    elif alert_type == "info":
+        sound_data = INFO_SOUND
+        volume = 0.3
+    elif alert_type == "success":
+        sound_data = SUCCESS_SOUND
         volume = 0.3
     else:
         return ""
-
-    # Unique ID
+    
+    # Generate unique ID for audio element
     audio_id = f"audio_{alert_type}_{int(time.time() * 1000)}"
-
-    # IMPORTANT:
-    # 1. muted autoplay is browser-allowed
-    # 2. then JS unmutes + plays (works after Streamlit render)
-
-    return f"""
-    <audio id="{audio_id}" preload="auto" muted>
-        <source src="audio.wav" type="audio/wav">
+    
+    # Return HTML with JavaScript to play sound
+    return f'''
+    <audio id="{audio_id}" preload="auto">
+        <source src="{sound_data}" type="audio/wav">
     </audio>
-
     <script>
         (function() {{
             const audio = document.getElementById("{audio_id}");
-            if (!audio) return;
-
-            audio.volume = {volume};
-
-            // First try autoplay (allowed when muted)
-            audio.play().then(() => {{
-                // Unmute after start
-                audio.muted = false;
-            }}).catch(err => {{
-                console.log("Autoplay blocked:", err);
-            }});
+            if (audio) {{
+                audio.volume = {volume};
+                // Use a user gesture to enable audio
+                const playAudio = () => {{
+                    audio.play().catch(e => {{
+                        console.log("Audio play failed:", e);
+                    }});
+                }};
+                // Try to play immediately
+                playAudio();
+                // Also set up for future plays
+                document.addEventListener('click', playAudio, {{ once: true }});
+            }}
         }})();
     </script>
-    """
-
+    '''
 
 # ------------------ CSS (Enhanced with Animations) ------------------
 st.markdown("""
@@ -673,6 +718,16 @@ st.markdown("""
     .folium-map {
         width: 100% !important;
     }
+    
+    /* Button styles */
+    .stButton > button {
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -689,10 +744,11 @@ def enforce_water_level_control(user_id, sensor_data):
             user_manager.add_notification(user_id, "🚨 EMERGENCY SHUTDOWN", 
                                 f"Water level CRITICAL at {water_level:.1f}%. Drainage CLOSED automatically!", 
                                 "emergency")
+            # Play emergency sound
+            st.markdown(generate_sound_alert("emergency", user_id), unsafe_allow_html=True)
         
         # Prevent any further increase in water level
-        if sensor_data["water_level"] > 95:
-            sensor_data["water_level"] = 95
+        sensor_data["water_level"] = min(95, water_level)
     
     # If water is between 90-95%, open drain to reduce level
     elif water_level >= 90 and not drain_open:
@@ -700,6 +756,8 @@ def enforce_water_level_control(user_id, sensor_data):
         user_manager.add_notification(user_id, "⚠️ High Water Level", 
                             f"Water level reached {water_level:.1f}%. Drainage automatically OPENED.", 
                             "warning")
+        # Play warning sound
+        st.markdown(generate_sound_alert("warning", user_id), unsafe_allow_html=True)
     
     # If water drops below 30%, close drain to conserve water
     elif water_level <= 30 and drain_open:
@@ -707,6 +765,8 @@ def enforce_water_level_control(user_id, sensor_data):
         user_manager.add_notification(user_id, "💧 Low Water Level", 
                             f"Water level dropped to {water_level:.1f}%. Drainage CLOSED to conserve water.", 
                             "info")
+        # Play info sound
+        st.markdown(generate_sound_alert("info", user_id), unsafe_allow_html=True)
     
     return sensor_data
 
@@ -920,14 +980,12 @@ with st.sidebar:
     with col1:
         if st.button("Open Drain", type="primary", use_container_width=True,
                     disabled=sensor_data["water_level"] >= 95):
-            sensor_data["drain_status"] = True
             user_manager.update_sensor_data(user_id, {"drain_status": 1})
             user_manager.add_notification(user_id, "Drainage Manually Opened", 
                                 "Drainage valve opened manually", "info")
             st.rerun()
     with col2:
         if st.button("Close Drain", type="secondary", use_container_width=True):
-            sensor_data["drain_status"] = False
             user_manager.update_sensor_data(user_id, {"drain_status": 0})
             user_manager.add_notification(user_id, "Drainage Manually Closed", 
                                 "Drainage valve closed manually", "warning")
@@ -939,16 +997,31 @@ with st.sidebar:
     with sim_col1:
         if st.button("+10%", use_container_width=True,
                     disabled=sensor_data["water_level"] >= 95):
-            new_level = min(100, sensor_data["water_level"] + 10)
-            sensor_data["water_level"] = new_level
+            # Update water level by +10%
+            new_level = min(95, sensor_data["water_level"] + 10)
             user_manager.update_sensor_data(user_id, {"water_level": new_level})
+            user_manager.add_notification(user_id, "Water Level Increased", 
+                                f"Water level manually increased to {new_level:.1f}%", "info")
             st.rerun()
     with sim_col2:
         if st.button("-10%", use_container_width=True):
+            # Update water level by -10%
             new_level = max(0, sensor_data["water_level"] - 10)
-            sensor_data["water_level"] = new_level
             user_manager.update_sensor_data(user_id, {"water_level": new_level})
+            user_manager.add_notification(user_id, "Water Level Decreased", 
+                                f"Water level manually decreased to {new_level:.1f}%", "info")
             st.rerun()
+    
+    # Fine-grained water level control
+    st.markdown("#### Precise Water Level Control")
+    water_slider = st.slider("Set Water Level (%)", 0, 100, int(sensor_data["water_level"]), 5,
+                           disabled=sensor_data["water_level"] >= 95)
+    
+    if water_slider != sensor_data["water_level"]:
+        user_manager.update_sensor_data(user_id, {"water_level": water_slider})
+        user_manager.add_notification(user_id, "Water Level Adjusted", 
+                            f"Water level set to {water_slider}%", "info")
+        st.rerun()
     
     # Notifications Section
     st.markdown("---")
